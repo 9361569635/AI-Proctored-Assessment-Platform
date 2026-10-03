@@ -1,0 +1,75 @@
+# Local/self-hosted deployment. NOT for the coding-sandbox images
+# themselves — build those separately first:
+#   cd docker/coding-sandbox && ./build-images.sh
+# (they run as sibling containers on the host, invoked by the backend via
+# the mounted Docker socket below — not built or run by this compose file.)
+#
+# First-time setup:
+#   cp .env.example .env               # fill in secrets — see README
+#   docker compose up -d postgres
+#   docker compose run --rm backend npx prisma migrate dev --schema=../database/schema/schema.prisma
+#   docker compose run --rm backend npm run seed
+#   docker compose up -d
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ai_assessment_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      # Overrides whatever's in .env — inside the compose network the
+      # database is reachable at the service name "postgres", not localhost.
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_assessment_platform
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e 'fetch(\"http://localhost:4000/health/ready\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Lets the backend's coding executor run `docker run <image>` against
+      # the HOST's Docker daemon (sibling containers) rather than needing a
+      # nested daemon inside this container. This grants the backend
+      # container real control over the host's Docker — acceptable for a
+      # trusted single-host deployment, but worth knowing before exposing
+      # this setup beyond that.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - backend_uploads:/repo/backend/uploads
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:4000/api
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  backend_uploads:

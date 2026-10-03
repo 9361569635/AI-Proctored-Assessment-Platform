@@ -1,0 +1,64 @@
+{
+  "name": "ai-assessment-secure-exam",
+  "version": "1.0.0",
+  "description": "Locked-down Electron shell for running the AI Assessment Platform candidate exam on managed devices.",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "cross-env NODE_ENV=development electron .",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux",
+    "dist": "electron-builder -mwl"
+  },
+  "dependencies": {
+    "electron": "^31.3.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.aiassessment.secureexam",
+    "productName": "AI Assessment Secure Exam",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      { "from": "config.example.json", "to": "config.example.json" }
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "category": "public.app-category.education",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSCameraUsageDescription": "The exam requires camera access for identity and proctoring verification.",
+        "NSMicrophoneUsageDescription": "The exam requires microphone access for the communication session and voice-anomaly proctoring."
+      }
+    },
+    "linux": {
+      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "category": "Education"
+    }
+  }
+}

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Proctor Override</title>
+<style>
+  body { margin:0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background:#111827; color:#f3f4f6;
+         display:flex; align-items:center; justify-content:center; height:100vh; }
+  .card { background:#1f2937; border:1px solid #374151; border-radius:10px; padding:28px 32px; width:340px; }
+  h1 { font-size:15px; margin:0 0 6px; }
+  p { font-size:12px; color:#9ca3af; margin:0 0 16px; line-height:1.4; }
+  input { width:100%; box-sizing:border-box; padding:9px 10px; border-radius:6px; border:1px solid #4b5563;
+          background:#111827; color:#f9fafb; font-size:13px; margin-bottom:10px; }
+  .row { display:flex; gap:8px; }
+  button { flex:1; padding:9px 10px; border-radius:6px; border:none; font-size:13px; cursor:pointer; }
+  .primary { background:#2563eb; color:white; }
+  .secondary { background:#374151; color:#e5e7eb; }
+  .err { color:#f87171; font-size:11px; min-height:14px; margin:-4px 0 8px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Proctor Override</h1>
+    <p>This unlocks the exam window for authorized exam-center staff only.
+       Unauthorized use may invalidate this candidate's attempt.</p>
+    <input id="code" type="password" placeholder="Override code" autofocus />
+    <div class="err" id="err"></div>
+    <div class="row">
+      <button class="secondary" id="cancel">Cancel</button>
+      <button class="primary" id="submit">Unlock</button>
+    </div>
+  </div>
+  <script src="./override-renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Connection lost</title>
+<style>
+  body { margin:0; font-family: -apple-system, Segoe UI, Arial, sans-serif; background:#0f172a; color:#e2e8f0;
+         display:flex; align-items:center; justify-content:center; height:100vh; text-align:center; }
+  .box { max-width:420px; }
+  h1 { font-size:18px; margin-bottom:8px; }
+  p { font-size:13px; color:#94a3b8; line-height:1.5; }
+  #countdown { font-weight:600; color:#e2e8f0; }
+  button { margin-top:16px; padding:9px 18px; border-radius:6px; border:none; background:#2563eb; color:white;
+           font-size:13px; cursor:pointer; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1>Connection lost</h1>
+    <p>The exam server can't be reached right now. Your progress is saved on the server
+       each time you answer, so it's safe to wait — do not close this window.</p>
+    <p>Retrying in <span id="countdown">10</span>s…</p>
+    <button id="retry">Retry now</button>
+  </div>
+  <script>
+    let n = 10;
+    const el = document.getElementById("countdown");
+    const timer = setInterval(() => {
+      n -= 1;
+      el.textContent = String(Math.max(n, 0));
+      if (n <= 0) {
+        clearInterval(timer);
+        window.location.reload();
+      }
+    }, 1000);
+    document.getElementById("retry").addEventListener("click", () => window.location.reload());
+  </script>
+</body>
+</html>

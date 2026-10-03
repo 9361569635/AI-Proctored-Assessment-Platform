@@ -1,0 +1,6 @@
+{
+  "assessmentUrl": "http://localhost:5173/candidate/system-check",
+  "allowedOrigin": "http://localhost:5173",
+  "orgName": "AI Assessment Platform",
+  "overrideCode": "change-me-per-deployment"
+}

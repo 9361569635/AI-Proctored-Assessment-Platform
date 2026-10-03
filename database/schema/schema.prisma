@@ -1,0 +1,434 @@
+// ============================================================================
+// AI Recruitment Assessment Platform - Database Schema
+// Provider: PostgreSQL | ORM: Prisma
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CANDIDATE
+  MANAGEMENT
+  SUPER_ADMIN
+}
+
+enum AssessmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  TERMINATED
+  EXPIRED
+}
+
+enum EligibilityStatus {
+  PENDING
+  ELIGIBLE
+  NOT_ELIGIBLE
+}
+
+enum FinalStatus {
+  PENDING
+  SHORTLISTED
+  NOT_SHORTLISTED
+  UNDER_REVIEW
+  REJECTED
+}
+
+enum ShortlistCategory {
+  STRONGLY_RECOMMENDED
+  RECOMMENDED
+  CONSIDER
+  UNDER_REVIEW
+  NOT_SHORTLISTED
+  REJECTED
+}
+
+enum QuestionDifficulty {
+  EASY
+  MODERATE
+  HARD
+}
+
+enum QuestionSourceType {
+  AI_GENERATED
+  CURATED
+}
+
+enum SessionType {
+  APTITUDE
+  LOGICAL
+  REASONING
+  COMMUNICATION
+  GRAMMAR
+  EASY_CODING
+  MODERATE_CODING
+  HARD_CODING
+}
+
+enum SessionStatus {
+  LOCKED
+  IN_PROGRESS
+  COMPLETED
+  FAILED_ELIGIBILITY
+}
+
+enum CodingLanguage {
+  PYTHON
+  C
+  CPP
+  JAVA
+  R
+  SWIFT
+}
+
+enum ProctoringSeverity {
+  INFO
+  WARNING
+  VIOLATION
+  CRITICAL
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  tokenVersion Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  candidate       Candidate?
+  managementUser  ManagementUser?
+  auditLogs       AuditLog[]
+
+  @@index([email])
+}
+
+model Candidate {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone      String
+  jobRoleId  String
+  jobRole    JobRole  @relation(fields: [jobRoleId], references: [id])
+  resume     Resume?
+  createdAt  DateTime @default(now())
+
+  // Pre-assessment verification photo, captured on the Consent page before
+  // Start Assessment is enabled. Nullable - not set until the candidate
+  // actually captures one; overwritten in place on retake (no history kept).
+  photoData     Bytes?
+  photoMimeType String?
+
+  skills             Skill[]
+  assessments        Assessment[]
+  audioResponses     AudioResponse[]
+  codingSubmissions  CodingSubmission[]
+  codeDrafts         CodeDraft[]
+  score              Score?
+  shortlisting       Shortlisting?
+  securityCapabilities SecurityCapability[]
+
+  @@index([jobRoleId])
+}
+
+model ManagementUser {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions String[]
+  createdAt   DateTime @default(now())
+}
+
+model JobRole {
+  id           String   @id @default(cuid())
+  title        String
+  description  String
+  requirements Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  candidates Candidate[]
+  assessments Assessment[]
+}
+
+model Resume {
+  id             String   @id @default(cuid())
+  candidateId    String   @unique
+  candidate      Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  filePath       String
+  extractedText  String    @db.Text
+  parsedData     Json
+  matchResult    Json?
+  uploadedAt     DateTime  @default(now())
+}
+
+model Skill {
+  id           String   @id @default(cuid())
+  candidateId  String
+  candidate    Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  skill        String
+  proficiency  String?
+
+  @@index([candidateId])
+}
+
+model Question {
+  id             String             @id @default(cuid())
+  session        SessionType
+  question       String             @db.Text
+  difficulty     QuestionDifficulty
+  options        Json
+  correctAnswer  String
+  marks          Int
+  sourceType     QuestionSourceType @default(AI_GENERATED)
+  createdAt      DateTime           @default(now())
+
+  assessmentSessionId  String?
+  assessmentSession    AssessmentSession? @relation(fields: [assessmentSessionId], references: [id], onDelete: Cascade)
+
+  answers        Answer[]
+  audioResponses AudioResponse[]
+
+  @@index([assessmentSessionId])
+}
+
+model SessionCodingQuestion {
+  id                   String            @id @default(cuid())
+  assessmentSessionId  String
+  assessmentSession    AssessmentSession @relation(fields: [assessmentSessionId], references: [id], onDelete: Cascade)
+  codingQuestionId     String
+  codingQuestion       CodingQuestion    @relation(fields: [codingQuestionId], references: [id])
+  order                Int
+
+  @@unique([assessmentSessionId, codingQuestionId])
+  @@index([assessmentSessionId])
+}
+
+model Assessment {
+  id                 String             @id @default(cuid())
+  candidateId        String
+  candidate          Candidate          @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  jobRoleId          String
+  jobRole            JobRole            @relation(fields: [jobRoleId], references: [id])
+  startTime          DateTime?
+  endTime            DateTime?
+  status             AssessmentStatus   @default(NOT_STARTED)
+  totalScore         Float?
+  eligibility        EligibilityStatus  @default(PENDING)
+  resultReleaseTime  DateTime?
+  createdAt          DateTime           @default(now())
+
+  sessions          AssessmentSession[]
+  proctoringEvents  ProctoringEvent[]
+  securityCapabilities SecurityCapability[]
+
+  @@index([candidateId])
+  @@index([status])
+}
+
+model AssessmentSession {
+  id             String        @id @default(cuid())
+  assessmentId   String
+  assessment     Assessment    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  sessionNumber  Int
+  sessionType    SessionType
+  startTime      DateTime?
+  endTime        DateTime?
+  score          Float?
+  status         SessionStatus @default(LOCKED)
+
+  answers   Answer[]
+  questions Question[]
+  codingQuestions SessionCodingQuestion[]
+
+  @@index([assessmentId])
+}
+
+model Answer {
+  id          String              @id @default(cuid())
+  sessionId   String
+  session     AssessmentSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    Question            @relation(fields: [questionId], references: [id])
+  answer      String              @db.Text
+  isCorrect   Boolean?
+  marks       Float?
+  timeTaken   Int?
+
+  @@unique([sessionId, questionId])
+  @@index([sessionId])
+}
+
+model CodingQuestion {
+  id          String             @id @default(cuid())
+  session     SessionType
+  title       String
+  description String             @db.Text
+  difficulty  QuestionDifficulty
+  marks       Int
+
+  testCases   TestCase[]
+  submissions CodingSubmission[]
+  sessionAssignments SessionCodingQuestion[]
+  codeDrafts  CodeDraft[]
+}
+
+model CodeDraft {
+  id                String         @id @default(cuid())
+  candidateId       String
+  candidate         Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  assessmentId      String
+  sessionId         String
+  codingQuestionId  String
+  codingQuestion    CodingQuestion @relation(fields: [codingQuestionId], references: [id], onDelete: Cascade)
+  language          CodingLanguage
+  sourceCode        String         @db.Text
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([candidateId, assessmentId, sessionId, codingQuestionId, language])
+  @@index([candidateId])
+}
+
+model TestCase {
+  id                String         @id @default(cuid())
+  codingQuestionId  String
+  codingQuestion    CodingQuestion @relation(fields: [codingQuestionId], references: [id], onDelete: Cascade)
+  input             String         @db.Text
+  expectedOutput    String         @db.Text
+  isHidden          Boolean        @default(false)
+
+  @@index([codingQuestionId])
+}
+
+model CodingSubmission {
+  id                String          @id @default(cuid())
+  candidateId       String
+  candidate         Candidate       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  codingQuestionId  String
+  codingQuestion    CodingQuestion  @relation(fields: [codingQuestionId], references: [id])
+  language          CodingLanguage
+  sourceCode        String          @db.Text
+  submittedAt       DateTime        @default(now())
+
+  result CodingResult?
+
+  @@index([candidateId])
+  @@index([codingQuestionId])
+}
+
+model CodingResult {
+  id              String            @id @default(cuid())
+  submissionId    String            @unique
+  submission      CodingSubmission  @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  passedTests     Int
+  totalTests      Int
+  score           Float
+  executionTimeMs Int?
+  memoryUsageKb   Int?
+  compileError    String?           @db.Text
+  runtimeError    String?           @db.Text
+  testCaseResults Json?
+}
+
+model AudioResponse {
+  id                  String     @id @default(cuid())
+  candidateId         String
+  candidate           Candidate  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  questionId          String
+  question            Question   @relation(fields: [questionId], references: [id])
+  audioFilePath       String
+  transcript          String?    @db.Text
+  similarityScore     Float?
+  communicationScore  Float?
+  createdAt           DateTime   @default(now())
+
+  @@index([candidateId])
+}
+
+model ProctoringEvent {
+  id            String              @id @default(cuid())
+  assessmentId  String
+  assessment    Assessment          @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  eventType     String
+  severity      ProctoringSeverity
+  confidence    Float?
+  timestamp     DateTime            @default(now())
+  metadata      Json?
+
+  @@index([assessmentId])
+  @@index([eventType])
+}
+
+model Score {
+  candidateId          String   @id
+  candidate            Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  aptitudeScore        Float    @default(0)
+  logicalScore         Float    @default(0)
+  reasoningScore       Float    @default(0)
+  communicationScore   Float    @default(0)
+  grammarScore         Float    @default(0)
+  easyCodingScore      Float    @default(0)
+  moderateCodingScore  Float    @default(0)
+  hardCodingScore      Float    @default(0)
+  totalScore           Float    @default(0)
+  updatedAt            DateTime @updatedAt
+}
+
+model Shortlisting {
+  candidateId        String             @id
+  candidate          Candidate          @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  eligibility        EligibilityStatus  @default(PENDING)
+  finalStatus        FinalStatus        @default(UNDER_REVIEW)
+  category           ShortlistCategory?
+  managementComment  String?            @db.Text
+  finalizedAt        DateTime?
+  resultReleaseAt    DateTime?
+  resultViewed       Boolean            @default(false)
+  resultViewedAt     DateTime?
+  aiAnalysis         Json?
+}
+
+model SecurityCapability {
+  id                String     @id @default(cuid())
+  assessmentId      String
+  assessment        Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  candidateId       String
+  candidate         Candidate  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  camera            Boolean
+  microphone        Boolean
+  fullscreen        Boolean
+  clipboardBlocking Boolean
+  visibilityMonitor Boolean
+  faceDetection     Boolean
+  phoneDetection    Boolean
+  voiceMonitoring   Boolean
+  dynamicWatermark  Boolean
+  secureExamMode    Boolean
+  userAgent         String?    @db.Text
+  checkedAt         DateTime   @default(now())
+  metadata          Json?
+
+  @@unique([assessmentId])
+  @@index([candidateId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  timestamp DateTime @default(now())
+  metadata  Json?
+
+  @@index([entity, entityId])
+}
